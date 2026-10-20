@@ -11,7 +11,7 @@ YT Cutter 는 아래 오픈소스 구성요소를 사용합니다. 실행 파일
 | Qt Multimedia 내장 FFmpeg | 앱 안의 영상 재생 | LGPL v2.1+ | PySide6 휠에 포함. 위 Qt 고지와 함께 유지 |
 | [FFmpeg](https://ffmpeg.org/legal.html) (별도 실행 파일) | 병합·컷·인코딩 | 빌드에 따라 LGPL v2.1+ 또는 **GPL v2/v3** | 정확한 컷에 쓰는 libx264 가 포함된 빌드(예: gyan.dev essentials)는 **GPL**. ffmpeg.exe 를 동봉해 배포하면 FFmpeg 라이선스 전문과 **소스 코드 입수 방법**(빌드 제공처 링크 또는 소스 사본)을 함께 제공해야 함. 본 앱은 FFmpeg 를 별도 프로세스로 실행하므로 앱 코드 자체에 GPL 이 전파되지는 않는 것으로 일반적으로 해석됨 |
 | x264 (FFmpeg 에 포함) | H.264 인코딩 | GPL v2+ | 위 FFmpeg 항목과 동일. H.264 특허(MPEG LA/Via LA) 관련 사항은 국가·용도별로 확인 |
-| [Deno](https://deno.com) (선택) | 유튜브 JS 처리 런타임 | MIT | 동봉 시 MIT 라이선스 고지 |
+| [Deno](https://deno.com) (릴리스 zip 에 포함) | 유튜브 JS 처리 런타임 | MIT | MIT 라이선스 전문(`deno-LICENSE.md`)을 deno.exe 와 함께 동봉. `build.bat` 이 자동 복사 |
 | Python | 실행 환경 | PSF License | PyInstaller 로 묶인 경우 고지 권장 |
 | PyInstaller (빌드 도구) | exe 패키징 | GPL v2 + 부트로더 예외 | 부트로더 예외로 결과물 배포에 제약 없음 |
 
