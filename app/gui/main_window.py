@@ -2,19 +2,20 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QProcess, Qt, QUrl
 from PySide6.QtGui import QAction, QKeySequence, QPixmap, QShortcut
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QFrame, QScrollArea, QCheckBox, QComboBox, QDockWidget, QFileDialog,
     QFormLayout, QGridLayout, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
-    QMessageBox, QPlainTextEdit, QProgressBar, QPushButton, QRadioButton, QSplitter,
+    QMessageBox, QPlainTextEdit, QProgressBar, QProgressDialog, QPushButton, QRadioButton, QSplitter,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-from .. import APP_NAME, VERSION
+from .. import APP_NAME, VERSION, ytdlp_update
 from ..config import Settings
 from ..cutter import Segment
 from ..downloader import SSL_HINT, Downloader, set_network_compat
@@ -23,7 +24,7 @@ from ..ffmpeg_tools import (OUTPUT_BY_KEY, OUTPUTS, FFmpegPaths, MediaInfo, NoAu
 from ..logging_setup import get_logger, log_file_path
 from ..utils import (TimeFormatError, format_time, human_bytes, human_eta,
                      normalize_youtube_url, open_path, parse_time, validate_range)
-from ..workers import CutWorker, DownloadWorker, InfoWorker, ProbeWorker
+from ..workers import CutWorker, DownloadWorker, InfoWorker, ProbeWorker, YtdlpUpdateWorker
 from .dialogs import ask_ffmpeg, show_error
 from .player import PlayerWidget
 from .elide_label import ElideLabel
@@ -48,6 +49,8 @@ class MainWindow(QMainWindow):
         self.media: MediaInfo | None = None
         self.last_outputs: list[str] = []
         self.info_worker = self.dl_worker = self.cut_worker = self.probe_worker = None
+        self.update_worker = None
+        self.update_dlg: QProgressDialog | None = None
         self.net = QNetworkAccessManager(self)
 
         self._build_ui()
@@ -60,6 +63,8 @@ class MainWindow(QMainWindow):
             self.log_msg(f"FFmpeg: {self.ff.ffmpeg}")
         else:
             self.log_msg("FFmpeg를 찾지 못했습니다. [설정 > FFmpeg 위치 지정]을 확인하세요.")
+        if ytdlp_update.active_version:
+            self.log_msg(f"yt-dlp: 업데이트한 버전 {ytdlp_update.active_version} 사용")
 
     # ================================================================ UI 구성
     def _build_ui(self):
@@ -393,6 +398,10 @@ class MainWindow(QMainWindow):
         self.act_compat.setToolTip("SSL 인증서 오류(certificate verify failed)가 날 때 켜세요.")
         self.act_compat.toggled.connect(self.on_toggle_compat)
         m_set.addAction(self.act_compat)
+        self.act_update = QAction("yt-dlp 업데이트...", self)
+        self.act_update.setToolTip("다운로드가 안 되거나 403 오류가 날 때 최신 버전으로 업데이트하세요.")
+        self.act_update.triggered.connect(self.on_update_ytdlp)
+        m_set.addAction(self.act_update)
         m_set.addSeparator()
         a = QAction("로그 파일 열기", self)
         a.triggered.connect(lambda: open_path(log_file_path(), select=True))
@@ -430,7 +439,7 @@ class MainWindow(QMainWindow):
     # ================================================================ 상태
     def busy(self) -> bool:
         return any(w is not None and w.isRunning()
-                   for w in (self.info_worker, self.dl_worker, self.cut_worker))
+                   for w in (self.info_worker, self.dl_worker, self.cut_worker, self.update_worker))
 
     def update_state(self):
         fetching = bool(self.info_worker and self.info_worker.isRunning())
@@ -979,6 +988,68 @@ class MainWindow(QMainWindow):
             return True
         return False
 
+    def on_update_ytdlp(self):
+        if self.busy():
+            QMessageBox.information(self, "yt-dlp 업데이트", "진행 중인 작업이 끝난 뒤에 업데이트하세요.")
+            return
+        self.log_msg("yt-dlp 업데이트 시작")
+        dlg = QProgressDialog("yt-dlp 최신 버전을 확인하는 중...", None, 0, 0, self)
+        dlg.setWindowTitle("yt-dlp 업데이트")
+        dlg.setWindowModality(Qt.WindowModal)
+        dlg.setMinimumDuration(0)
+        dlg.setMinimumWidth(360)
+        dlg.show()
+        self.update_dlg = dlg
+        w = YtdlpUpdateWorker(self.settings.network_compat, self)
+        w.message.connect(self.log_msg)
+        w.message.connect(dlg.setLabelText)
+        w.succeeded.connect(self._on_update_ok)
+        w.failed.connect(self._on_update_fail)
+        self.update_worker = w
+        self.act_update.setEnabled(False)
+        w.start()
+
+    def _close_update_dlg(self):
+        if self.update_dlg:
+            self.update_dlg.close()
+            self.update_dlg = None
+        self.act_update.setEnabled(True)
+
+    def _on_update_ok(self, res):
+        self._close_update_dlg()
+        if not res.updated:
+            self.log_msg(f"yt-dlp 는 이미 최신 버전입니다 ({res.after})")
+            QMessageBox.information(self, "yt-dlp 업데이트", f"이미 최신 버전입니다.\n\n현재 버전: {res.after}")
+            return
+        self.log_msg(f"yt-dlp 업데이트 완료: {res.before} → {res.after}")
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Information)
+        box.setWindowTitle("yt-dlp 업데이트")
+        box.setText(f"yt-dlp 를 업데이트했습니다.\n\n{res.before} → {res.after}\n\n"
+                    "프로그램을 다시 시작해야 새 버전이 적용됩니다.")
+        restart = box.addButton("지금 다시 시작", QMessageBox.AcceptRole)
+        box.addButton("나중에", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is restart:
+            self._restart()
+
+    def _on_update_fail(self, msg, detail):
+        self._close_update_dlg()
+        if self._offer_compat(msg, detail):
+            self.update_worker.wait()
+            self.on_update_ytdlp()
+            return
+        self.error(msg, detail)
+
+    def _restart(self):
+        """프로그램을 다시 실행한다 (업데이트한 yt-dlp 적용)."""
+        if getattr(sys, "frozen", False):
+            args = sys.argv[1:]
+        else:
+            args = [str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
+        if self.close():
+            QProcess.startDetached(sys.executable, args)
+
     def on_pick_outdir(self):
         d = QFileDialog.getExistingDirectory(self, "저장 폴더 선택", self.ed_outdir.text())
         if d:
@@ -1042,7 +1113,8 @@ class MainWindow(QMainWindow):
             "DRM 등 보호 조치를 우회하는 기능은 포함되어 있지 않습니다."))
 
     def closeEvent(self, ev):
-        running = [w for w in (self.dl_worker, self.cut_worker, self.info_worker, self.probe_worker)
+        running = [w for w in (self.dl_worker, self.cut_worker, self.info_worker, self.probe_worker,
+                               self.update_worker)
                    if w is not None and w.isRunning()]
         if running:
             if QMessageBox.question(self, "종료", "작업이 진행 중입니다. 취소하고 종료할까요?") \

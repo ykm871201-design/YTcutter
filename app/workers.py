@@ -5,7 +5,7 @@ import traceback
 
 from PySide6.QtCore import QThread, Signal
 
-from . import cutter, downloader
+from . import cutter, downloader, ytdlp_update
 from .ffmpeg_tools import FFmpegPaths, MissingEncoderError, NoAudioError, probe
 from .logging_setup import get_logger
 
@@ -106,3 +106,19 @@ class CutWorker(QThread):
             elif isinstance(e, OSError) and getattr(e, "errno", None) == 28:
                 msg = "디스크 공간이 부족합니다."
             self.failed.emit(msg, str(e))
+
+
+class YtdlpUpdateWorker(QThread):
+    message = Signal(str)
+    succeeded = Signal(object)        # ytdlp_update.UpdateResult
+    failed = Signal(str, str)
+
+    def __init__(self, compat: bool, parent=None):
+        super().__init__(parent)
+        self.compat = compat
+
+    def run(self):
+        try:
+            self.succeeded.emit(ytdlp_update.run_update(self.compat, self.message.emit))
+        except ytdlp_update.UpdateFailed as e:
+            self.failed.emit(e.message, e.detail)

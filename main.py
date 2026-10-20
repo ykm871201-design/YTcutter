@@ -11,8 +11,12 @@ if sys.stderr is None:
 
 from PySide6.QtWidgets import QApplication
 
-from app import APP_NAME
-from app.gui.main_window import MainWindow
+from app import APP_NAME, ytdlp_update
+
+if getattr(sys, "frozen", False):
+    ytdlp_update.activate()   # 업데이트로 받아 둔 yt-dlp 를 우선 사용 (yt_dlp import 전에 해야 함)
+
+from app.gui.main_window import MainWindow  # noqa: E402
 from app.logging_setup import setup_logging
 
 
