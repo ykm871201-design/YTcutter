@@ -43,6 +43,7 @@ if not exist dist\YTCutter\YTCutter.exe goto err_build
 call :step "[6/6] FFmpeg, Deno 와 문서 함께 넣기"
 if exist ffmpeg xcopy ffmpeg dist\YTCutter\ffmpeg\ /E /I /Y >>"%LOG%" 2>&1
 if not exist ffmpeg echo       [안내] ffmpeg 폴더가 없어 복사하지 않았습니다. 받는 사람이 FFmpeg 를 따로 설치해야 합니다.
+if exist deno.exe .venv\Scripts\python -c "from app.downloader import exe_machine as m; import sys; sys.exit(m('deno.exe') != m(r'dist\YTCutter\YTCutter.exe'))" >>"%LOG%" 2>&1 || echo       [경고] deno.exe 가 이 PC 와 다른 CPU 용입니다. 예: ARM64. x64 PC 용은 deno-x86_64-pc-windows-msvc.zip 입니다.
 if exist deno.exe copy /Y deno.exe dist\YTCutter\ >>"%LOG%" 2>&1
 if exist deno.exe copy /Y deno-LICENSE.md dist\YTCutter\ >>"%LOG%" 2>&1
 if exist README.md copy /Y README.md dist\YTCutter\ >>"%LOG%" 2>&1

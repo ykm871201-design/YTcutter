@@ -110,7 +110,9 @@ ytcutter/
 ```bat
 winget install DenoLand.Deno
 ```
-또는 `deno.exe` 를 프로그램 폴더에 넣으면 자동으로 사용합니다. (Node.js 가 설치되어 있으면 그것도 사용)
+또는 [Deno 릴리스](https://github.com/denoland/deno/releases)에서 받은 `deno.exe` 를 프로그램 폴더에 넣으면 자동으로 사용합니다. (Node.js 가 설치되어 있으면 그것도 사용)
+> 일반 PC(x64)는 **`deno-x86_64-pc-windows-msvc.zip`** 을 받으세요. `aarch64` 는 ARM 노트북(Snapdragon 등)용이라 일반 PC 에서는 실행되지 않습니다.
+> PC 와 맞지 않는 deno.exe 는 앱이 실행하지 않고 건너뛰며, 로그에 경고를 남깁니다.
 
 ### 3-4. 실행
 **방법 A — 더블클릭:** `run.bat` (처음 한 번은 가상환경을 만들고 패키지를 설치하느라 1~3분 걸림)
@@ -178,6 +180,7 @@ xcopy ffmpeg dist\YTCutter\ffmpeg\ /E /I /Y
 | 증상 | 원인·해결 |
 |---|---|
 | "FFmpeg를 찾을 수 없습니다" | 3-2절 방법으로 준비. winget 설치 직후라면 앱을 다시 실행 |
+| "deno.exe ... 다른 시스템을 위한 것입니다" (시스템 종류 불일치) / 로그에 "deno.exe 를 사용하지 않습니다" | PC 와 다른 CPU 용 Deno 입니다. 일반 PC 는 `deno-x86_64-pc-windows-msvc.zip` 의 deno.exe 로 바꾸세요 (3-3절) |
 | "유튜브가 자동화 요청으로 판단해 차단" / 403 오류 / 화질 목록이 비정상적으로 적음 | **[설정 > yt-dlp 업데이트]** 실행 후 프로그램 다시 시작. Deno 설치 확인. 잠시 후 재시도 |
 | "비공개 영상입니다" / "삭제되었거나 볼 수 없는 영상" | 공개 상태 확인. 로그인이 필요한 영상은 지원하지 않음 |
 | "연령 제한" / "멤버십 전용" | 로그인·권한이 필요한 콘텐츠는 지원하지 않음 |
@@ -212,7 +215,7 @@ xcopy ffmpeg dist\YTCutter\ffmpeg\ /E /I /Y
 pip install -r requirements-dev.txt
 python -m pytest -q
 ```
-77개 테스트 (단위 + 실제 FFmpeg/yt-dlp 통합 + 화면 없는 GUI 스모크).
+80개 테스트 (단위 + 실제 FFmpeg/yt-dlp 통합 + 화면 없는 GUI 스모크).
 
 개발 환경(Linux, Python 3.11, PySide6 6.11, yt-dlp 2026.08, FFmpeg 6.1)에서의 검증 결과:
 
