@@ -18,6 +18,7 @@
 - "호환성 우선" 옵션(기본 켜짐): H.264 + AAC 를 우선 선택 (유튜브 H.264는 최대 1080p)
 - 진행률 · 속도 · 남은 시간 표시, **취소**(임시 폴더 자동 삭제)
 - 비공개·삭제·연령 제한·멤버십·지역 제한·네트워크 오류 등을 한국어로 안내 + [자세히 보기]에 원본 로그
+- **[설정 > yt-dlp 업데이트]**: 유튜브가 바뀌어 다운로드가 막히면 버튼 한 번으로 yt-dlp 를 최신 버전으로 (exe 에서도 동작, 프로그램을 다시 시작하면 적용)
 
 **컷 편집**
 - 다운로드한 영상이 자동으로 열림, 또는 **로컬 영상 열기**(mp4/mkv/webm/mov 등)
@@ -65,6 +66,7 @@ ytcutter/
 │  ├─ utils.py              # 시간 변환·검증, 파일명 정리, 중복 이름, URL 검사
 │  ├─ ffmpeg_tools.py       # FFmpeg 탐색, ffprobe 분석, 컷·음원 명령 생성, 형식 선택
 │  ├─ downloader.py         # yt-dlp 정보 조회·다운로드·취소·오류 메시지 변환
+│  ├─ ytdlp_update.py       # yt-dlp 업데이트 (소스: pip, exe: PyPI 에서 받아 %APPDATA% 에 저장)
 │  ├─ cutter.py             # FFmpeg 컷·음원 추출 실행 (진행률·취소·임시 파일 정리)
 │  ├─ workers.py            # QThread 작업자 (UI 멈춤 방지)
 │  └─ gui/
@@ -176,7 +178,7 @@ xcopy ffmpeg dist\YTCutter\ffmpeg\ /E /I /Y
 | 증상 | 원인·해결 |
 |---|---|
 | "FFmpeg를 찾을 수 없습니다" | 3-2절 방법으로 준비. winget 설치 직후라면 앱을 다시 실행 |
-| "유튜브가 자동화 요청으로 판단해 차단" / 403 오류 / 화질 목록이 비정상적으로 적음 | yt-dlp 를 최신으로: `.venv\Scripts\pip install -U "yt-dlp[default]"` (exe 는 다시 빌드). Deno 설치 확인. 잠시 후 재시도 |
+| "유튜브가 자동화 요청으로 판단해 차단" / 403 오류 / 화질 목록이 비정상적으로 적음 | **[설정 > yt-dlp 업데이트]** 실행 후 프로그램 다시 시작. Deno 설치 확인. 잠시 후 재시도 |
 | "비공개 영상입니다" / "삭제되었거나 볼 수 없는 영상" | 공개 상태 확인. 로그인이 필요한 영상은 지원하지 않음 |
 | "연령 제한" / "멤버십 전용" | 로그인·권한이 필요한 콘텐츠는 지원하지 않음 |
 | `CERTIFICATE_VERIFY_FAILED` / `EE certificate key too weak` / "보안 연결(SSL 인증서) 확인에 실패" | 학교·회사 **보안 장비가 HTTPS를 검사**하면서 약한 키의 인증서를 쓰기 때문. [설정 > **네트워크 호환 모드**]를 켜고 다시 시도 (오류가 나면 앱이 먼저 물어봄). Windows 인증서 저장소를 사용하고 약한 키를 허용하며, 인증서 검증은 유지함. 그래도 안 되면 집·휴대폰 핫스팟 등 다른 네트워크에서 시도하거나 전산 담당자에게 youtube.com·googlevideo.com 검사 예외를 요청 |
@@ -210,7 +212,7 @@ xcopy ffmpeg dist\YTCutter\ffmpeg\ /E /I /Y
 pip install -r requirements-dev.txt
 python -m pytest -q
 ```
-66개 테스트 (단위 + 실제 FFmpeg/yt-dlp 통합 + 화면 없는 GUI 스모크).
+77개 테스트 (단위 + 실제 FFmpeg/yt-dlp 통합 + 화면 없는 GUI 스모크).
 
 개발 환경(Linux, Python 3.11, PySide6 6.11, yt-dlp 2026.08, FFmpeg 6.1)에서의 검증 결과:
 
@@ -233,6 +235,7 @@ python -m pytest -q
 | 한글·공백 경로/파일명 | ✅ 통과 (Linux) | `한글 경로/내 영상 파일.mp4`, `다운로드 폴더` 등 |
 | GUI 흐름 | ✅ 통과 (offscreen) | 파일 열기 → 잘못된 입력 → 구간 추가 → 정확한/빠른 컷 저장 → 구간 음원 저장 → 전체 음원 추출, 작업 중 버튼 비활성화 |
 | PyInstaller 패키징 | ✅ 통과 (**Linux 빌드**) | 빌드된 실행 파일에서 다운로드·병합·컷·QtMultimedia 로드 확인 |
+| **yt-dlp 업데이트** | ✅ 통과 (Linux) | 소스 실행: pip 로 2026.07.04 → 2026.08.19. exe: PyPI 에서 yt-dlp·yt-dlp-ejs 휠을 받아(sha256 확인) 저장 → PyInstaller 실행 파일이 묶인 것 대신 받은 버전을 불러옴 |
 | **실제 유튜브** 정보 조회·다운로드 | ⚠ **미검증** | 개발 환경 네트워크에서 youtube.com 접속이 차단됨. 비공개/삭제/연령제한 메시지는 yt-dlp 오류 문구 매핑만 단위 테스트 |
 | **Windows 10/11** 실행, `run.bat`/`build.bat`, 탐색기 열기, 콘솔 창 숨김 | ⚠ **미검증** | Windows 환경 없음 |
 | 플레이어 실제 화면·소리 재생, 썸네일 표시 | ⚠ **미검증** | 화면 없는 환경. 재생 위치/구간 로직은 검증 |

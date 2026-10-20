@@ -225,3 +225,25 @@ def test_bad_url(win):
     win.on_fetch_info()
     assert "유튜브" in win.errors[-1]
     assert win.info_worker is None
+
+
+def test_update_ytdlp_menu(win, monkeypatch):
+    """[설정 > yt-dlp 업데이트]: 작업 중 표시 → 결과 안내, 실패하면 오류 안내."""
+    from app import ytdlp_update
+    assert win.act_update in win.menuBar().actions()[1].menu().actions()
+
+    monkeypatch.setattr(ytdlp_update, "run_update",
+                        lambda compat, on_log: ytdlp_update.UpdateResult("2026.01.01", "2026.8.19"))
+    win.act_update.trigger()
+    assert not win.act_update.isEnabled()
+    assert wait(lambda: win.act_update.isEnabled())
+    assert win.update_dlg is None
+    assert "2026.01.01 → 2026.8.19" in win.log_view.toPlainText()
+
+    def fail(compat, on_log):
+        raise ytdlp_update.UpdateFailed("네트워크에 연결할 수 없습니다. 인터넷 연결을 확인하세요.", "detail")
+
+    monkeypatch.setattr(ytdlp_update, "run_update", fail)
+    win.act_update.trigger()
+    assert wait(lambda: win.act_update.isEnabled())
+    assert "인터넷 연결" in win.errors[-1]
