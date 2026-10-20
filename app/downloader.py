@@ -105,14 +105,93 @@ class _YdlLogger:
         self.errors.append(msg)
 
 
-def _js_runtimes() -> dict:
-    """프로그램 폴더에 deno.exe 가 있으면 그것을, 없으면 PATH 의 deno/node 를 사용."""
+_MACHINE_NAMES = {0x014C: "x86(32비트)", 0x8664: "x64", 0xAA64: "ARM64", 0x01C4: "ARM(32비트)"}
+# PC(운영체제)의 CPU 종류별로 실행할 수 있는 exe 종류. ARM64 Windows 11 은 x64/x86 도 에뮬레이션으로 실행
+_RUNNABLE = {0x8664: {0x8664, 0x014C}, 0xAA64: {0xAA64, 0x8664, 0x014C}, 0x014C: {0x014C}}
+
+
+def exe_machine(path) -> int | None:
+    """Windows 실행 파일(PE)이 어떤 CPU 용인지 (IMAGE_FILE_MACHINE_*). PE 형식이 아니면 None."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(64)
+            if len(head) < 64 or head[:2] != b"MZ":
+                return None
+            f.seek(int.from_bytes(head[0x3C:0x40], "little"))
+            pe = f.read(6)
+    except OSError:
+        return None
+    if len(pe) < 6 or pe[:4] != b"PE\0\0":
+        return None
+    return int.from_bytes(pe[4:6], "little")
+
+
+def native_machine() -> int:
+    """이 PC(Windows)의 CPU 종류. x64 프로그램이 ARM64 PC 에서 에뮬레이션으로 돌 때도 ARM64 를 돌려준다."""
+    try:
+        import ctypes
+        k32 = ctypes.WinDLL("kernel32")
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.IsWow64Process2.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ushort),
+                                        ctypes.POINTER(ctypes.c_ushort)]
+        proc, native = ctypes.c_ushort(), ctypes.c_ushort()
+        if k32.IsWow64Process2(k32.GetCurrentProcess(), ctypes.byref(proc), ctypes.byref(native)):
+            return native.value
+    except (AttributeError, OSError):   # Windows 가 아니거나 Windows 10 1709 이전
+        pass
+    arch = os.environ.get("PROCESSOR_ARCHITEW6432") or os.environ.get("PROCESSOR_ARCHITECTURE", "")
+    return {"ARM64": 0xAA64, "X86": 0x014C}.get(arch.upper(), 0x8664)
+
+
+def deno_problem(path, native: int | None = None) -> str | None:
+    """이 PC 에서 실행할 수 없는 deno 이면 그 이유. 문제없으면 None.
+
+    맞지 않는 exe 를 실행하면 Windows 가 '시스템 종류 불일치' 창을 띄우므로 실행 전에 확인한다.
+    """
+    if native is None:
+        if os.name != "nt":
+            return None
+        native = native_machine()
+    machine = exe_machine(path)
+    if machine is None:
+        return "Windows 실행 파일이 아닙니다"
+    if machine not in _RUNNABLE.get(native, {native}):
+        return (f"{_MACHINE_NAMES.get(machine, hex(machine))}용이라 이 PC"
+                f"({_MACHINE_NAMES.get(native, hex(native))})에서 실행할 수 없습니다")
+    return None
+
+
+def find_deno() -> tuple[str | None, list[str]]:
+    """사용할 deno 경로와, 맞지 않아 건너뛴 deno 에 대한 안내 목록.
+
+    프로그램 폴더 → PATH 순서로 찾는다. PATH 도 직접 찾는 이유: 맞지 않는 deno.exe 를 건너뛰어도
+    yt-dlp 가 스스로 찾으면 현재 폴더(=프로그램 폴더)의 그 파일을 다시 실행할 수 있기 때문.
+    """
     from .utils import app_base_dir
     exe = "deno.exe" if os.name == "nt" else "deno"
-    for p in (app_base_dir() / exe, app_base_dir() / "deno" / exe):
-        if p.is_file():
-            return {"deno": {"path": str(p)}, "node": {}}
-    return {"deno": {}, "node": {}}
+    candidates = [app_base_dir() / exe, app_base_dir() / "deno" / exe]
+    candidates += [Path(d) / exe for d in os.environ.get("PATH", "").split(os.pathsep) if d.strip()]
+    skipped, seen = [], set()
+    for p in candidates:
+        key = os.path.normcase(str(p))
+        if key in seen or not p.is_file():
+            continue
+        seen.add(key)
+        problem = deno_problem(p)
+        if problem is None:
+            return str(p), skipped
+        skipped.append(f"{p}: {problem}")
+    return None, skipped
+
+
+def _js_runtimes() -> dict:
+    """프로그램 폴더 또는 PATH 의 deno(이 PC 에서 실행 가능한 것)를, 없으면 node 를 사용."""
+    deno, skipped = find_deno()
+    for s in skipped:
+        log.warning("deno 건너뜀 - %s", s)
+    if deno:
+        return {"deno": {"path": deno}, "node": {}}
+    return {"node": {}}
 
 
 _compat_patched = False

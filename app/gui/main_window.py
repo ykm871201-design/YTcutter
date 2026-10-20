@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from .. import APP_NAME, VERSION, ytdlp_update
 from ..config import Settings
 from ..cutter import Segment
-from ..downloader import SSL_HINT, Downloader, set_network_compat
+from ..downloader import SSL_HINT, Downloader, find_deno, set_network_compat
 from ..ffmpeg_tools import (OUTPUT_BY_KEY, OUTPUTS, FFmpegPaths, MediaInfo, NoAudioError,
                             audio_output_plan, find_ffmpeg)
 from ..logging_setup import get_logger, log_file_path
@@ -63,6 +63,11 @@ class MainWindow(QMainWindow):
             self.log_msg(f"FFmpeg: {self.ff.ffmpeg}")
         else:
             self.log_msg("FFmpeg를 찾지 못했습니다. [설정 > FFmpeg 위치 지정]을 확인하세요.")
+        deno, skipped = find_deno()
+        for s in skipped:
+            self.log_msg(f"경고: deno.exe 를 사용하지 않습니다 - {s}. "
+                         "이 PC 에 맞는 Deno(보통 x86_64-pc-windows)로 바꿔 주세요.")
+        self.log_msg(f"Deno: {deno}" if deno else "Deno 를 찾지 못했습니다 (일부 영상은 받지 못할 수 있음).")
         if ytdlp_update.active_version:
             self.log_msg(f"yt-dlp: 업데이트한 버전 {ytdlp_update.active_version} 사용")
 
