@@ -40,10 +40,11 @@ call :step "[5/6] 빌드 - 몇 분 걸립니다. 창을 닫지 마세요"
 if errorlevel 1 goto err_build
 if not exist dist\YTCutter\YTCutter.exe goto err_build
 
-call :step "[6/6] FFmpeg 와 문서 함께 넣기"
+call :step "[6/6] FFmpeg, Deno 와 문서 함께 넣기"
 if exist ffmpeg xcopy ffmpeg dist\YTCutter\ffmpeg\ /E /I /Y >>"%LOG%" 2>&1
 if not exist ffmpeg echo       [안내] ffmpeg 폴더가 없어 복사하지 않았습니다. 받는 사람이 FFmpeg 를 따로 설치해야 합니다.
 if exist deno.exe copy /Y deno.exe dist\YTCutter\ >>"%LOG%" 2>&1
+if exist deno.exe copy /Y deno-LICENSE.md dist\YTCutter\ >>"%LOG%" 2>&1
 if exist README.md copy /Y README.md dist\YTCutter\ >>"%LOG%" 2>&1
 if exist THIRD_PARTY_NOTICES.md copy /Y THIRD_PARTY_NOTICES.md dist\YTCutter\ >>"%LOG%" 2>&1
 
