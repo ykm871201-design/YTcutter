@@ -162,7 +162,7 @@ python main.py
 build.bat
 ```
 - PyInstaller **onedir** 방식으로 `dist\YTCutter\YTCutter.exe` 를 만듭니다 (Qt DLL 이 분리되어 LGPL 요건 충족에 유리).
-- `ytcutter\ffmpeg\` 폴더와 `deno.exe` 가 있으면 자동으로 함께 복사합니다. (`deno.exe` 를 넣으면 라이선스 고지 `deno-LICENSE.md` 도 함께 복사)
+- `ytcutter\ffmpeg\` 폴더와 `deno.exe` 가 있으면 자동으로 함께 복사합니다. `deno.exe` 는 저장소에 없으므로 빌드 전에 `ytcutter\` 폴더(build.bat 옆)에 직접 넣으세요. 라이선스 고지 `deno-LICENSE.md` 는 항상 함께 복사합니다.
 - 배포할 때는 `dist\YTCutter` 폴더 전체를 압축해서 전달하세요. **THIRD_PARTY_NOTICES.md** 와 FFmpeg 라이선스 고지를 꼭 포함하세요.
 
 수동 명령:
